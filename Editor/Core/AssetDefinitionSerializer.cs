@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -35,8 +36,15 @@ namespace AssetsExporting
 
         public void Serialize()
         {
-            foreach(var assetDefinition in m_AssetDefinitions)
-                File.AppendText(assetDefinition.ToString() + c_AssetSeparator);
+            try
+            {
+                File.WriteAllText(FilePath, "");
+
+                foreach(var assetDefinition in m_AssetDefinitions)
+                    File.AppendAllText(FilePath, assetDefinition.ToString() + c_AssetSeparator);
+            }
+            catch(Exception)
+            { }
         }
 
     }
@@ -47,9 +55,14 @@ namespace AssetsExporting
         public AssetDefinitionDeserializer(string filePath) : base(filePath)
         { }
 
-        public IEnumerator<AssetDefinition> Deserialize()
+        public IEnumerable<AssetDefinition> Deserialize()
         {
-            var fileContent = File.ReadAllText(FilePath);
+            string fileContent = "";
+            try
+            { fileContent = File.ReadAllText(FilePath); }
+            catch(Exception)
+            { }
+
             var assetPaths = fileContent.Split(new string[] { c_AssetSeparator }, System.StringSplitOptions.RemoveEmptyEntries);
 
             m_AssetDefinitions.Clear();
@@ -57,7 +70,7 @@ namespace AssetsExporting
             foreach(var assetPath in assetPaths)
                 m_AssetDefinitions.Add(new AssetDefinition(assetPath));
 
-            return m_AssetDefinitions.GetEnumerator();
+            return m_AssetDefinitions;
         }
 
     }

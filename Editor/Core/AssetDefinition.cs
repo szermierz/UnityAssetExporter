@@ -11,17 +11,9 @@ namespace AssetsExporting
 
         public string AssetPath { get; protected set; }
 
-        protected List<AssetDefinition> m_RelatedAssets = new List<AssetDefinition>();
-        public List<AssetDefinition> RelatedAssets { get { return m_RelatedAssets; } }
-
         public AssetDefinition(string assetPath)
         {
             AssetPath = assetPath;
-        }
-
-        public void AddRelatedAsset(AssetDefinition assetDefinition)
-        {
-            RelatedAssets.Add(assetDefinition);
         }
 
         public string Extension
