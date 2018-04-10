@@ -49,6 +49,8 @@ public class AssetsImportingWindow : EditorWindow
                 var path = AssetDatabase.GUIDToAssetPath(selectedObject);
                 exporter.Export(path);
             }
+
+            EditorUtility.DisplayDialog("Finished!", "The process has finished. Successfuly or not", "Ok", "Ok, but on right");
         }
 
         if(GUILayout.Button("Import assets from a folder containing export info files"))
@@ -74,6 +76,8 @@ public class AssetsImportingWindow : EditorWindow
                 var importer = new AssetsImporter(folder);
                 importer.Import(file);
             }
+
+            EditorUtility.DisplayDialog("Finished!", "The process has finished. Successfuly or not", "Ok", "Ok, but on right");
         }
     }
 }
