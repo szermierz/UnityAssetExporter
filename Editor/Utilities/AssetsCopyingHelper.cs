@@ -32,7 +32,7 @@ namespace AssetsExportingHelpers
                     if(m_RememberedDecision.HasValue)
                         moveToNewDir = m_RememberedDecision.Value;
                     else
-                        moveToNewDir =  EditorUtility.DisplayDialog("Asset duplication detected!", "File :" + filename + "\n is duplicated", "Move to new directory", "Keep previous directory");
+                        moveToNewDir =  EditorUtility.DisplayDialog("Asset duplication detected!", "File: " + filename + "\nis duplicated", "Move to new directory", "Keep previous directory");
 
                     if(!m_HasAskedToRemember)
                     {
