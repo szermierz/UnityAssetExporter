@@ -83,12 +83,47 @@ namespace AssetsExportingHelpers
             UnityEditor.AssetDatabase.StartAssetEditing();
             try
             {
-                File.Copy(sourcePath, destPath);
-                File.Copy(GetMetaFilePath(sourcePath), GetMetaFilePath(destPath));
+                CopyAssetFile(sourcePath, destPath);
             }
-            catch(Exception)
-            { }
-            UnityEditor.AssetDatabase.StopAssetEditing();
+            finally
+            {
+                UnityEditor.AssetDatabase.StopAssetEditing();
+            }
+        }
+
+        protected virtual void CopyAssetFile(string sourcePath, string destPath)
+        {
+            PrepareDirectoryToFileCopying(ref sourcePath, false);
+            PrepareDirectoryToFileCopying(ref destPath, true);
+
+            if(!File.Exists(sourcePath))
+                return;
+
+            FileUtil.CopyFileOrDirectory(sourcePath, destPath);
+            FileUtil.CopyFileOrDirectory(GetMetaFilePath(sourcePath), GetMetaFilePath(destPath));
+        }
+
+        protected virtual void PrepareDirectoryToFileCopying(ref string path, bool ensureDirectoryExists)
+        {
+            path = path.Replace('\\', '/');
+
+            var pathDirectories = path.Split('/');
+            if(pathDirectories.Length < 2)
+                return;
+
+            if(!ensureDirectoryExists)
+                return;
+
+            var subPath = pathDirectories[0];
+            for(int i = 1; i < pathDirectories.Length - 1; ++i)
+            {
+                subPath += "/" + pathDirectories[i];
+
+                if(File.Exists(subPath) || Directory.Exists(subPath))
+                    continue;
+
+                Directory.CreateDirectory(subPath);
+            }
         }
 
         public virtual bool DoesFilesMatch(string lhvAbsolutePath, string rhvAbsolutePath)
@@ -136,7 +171,7 @@ namespace AssetsExportingHelpers
 
         private string GetMetaFilePath(string filePath)
         {
-            return Path.GetDirectoryName(filePath) + "/" + Path.GetFileNameWithoutExtension(filePath) + ".meta";
+            return filePath + ".meta";
         }
 
 

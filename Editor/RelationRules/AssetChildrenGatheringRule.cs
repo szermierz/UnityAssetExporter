@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEditor;
 
 namespace AssetsExporting
-{
+{ 
 
     public class AssetChildrenGatheringRule : AssetRelationRuleBase
     {
