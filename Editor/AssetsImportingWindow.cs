@@ -61,7 +61,7 @@ public class AssetsImportingWindow : EditorWindow
 
             IEnumerable<string> files = null;
             try
-            { files = Directory.EnumerateFiles(descriptorsFolder); }
+            { files = Directory.GetFiles(descriptorsFolder); }
             catch(Exception)
             {
                 Debug.LogError("[Assets Importing Window] Couldn't find any export info files!");

@@ -39,12 +39,51 @@ namespace AssetsExporting
         public AssetRelationRuleBase.ObjectMatchedDelegate OnObjectEntered;
         public AssetRelationRuleBase.ObjectMatchedDelegate OnObjectFound;
 
+        protected Queue<UnityEngine.Object> m_ObjectsToEnterPool = new Queue<UnityEngine.Object>();
+
         public virtual void Build(UnityEngine.Object unityObject)
         {
-            OnObjectFound -= EnterObject;
-            OnObjectFound += EnterObject;
+            Build(Enumerable.Repeat(unityObject, 1));
+        }
 
-            OnObjectFound.Invoke(unityObject);
+        public virtual void Build(IEnumerable<UnityEngine.Object> unityObjects)
+        {
+            OnObjectFound -= QueueObject;
+            OnObjectFound += QueueObject;
+
+            QueueObject(unityObjects);
+
+            HashSet<UnityEngine.Object> alreadyEnteredObjects = new HashSet<UnityEngine.Object>();
+
+            while(EnterNextQueueObject(alreadyEnteredObjects))
+                ;
+        }
+
+        protected virtual bool EnterNextQueueObject(HashSet<UnityEngine.Object> alreadyEnteredObjects)
+        {
+            if(!m_ObjectsToEnterPool.Any())
+                return false;
+
+            var objectToEnter = m_ObjectsToEnterPool.Dequeue();
+
+            if(null == objectToEnter || alreadyEnteredObjects.Contains(objectToEnter))
+                return true;
+
+            alreadyEnteredObjects.Add(objectToEnter);
+            EnterObject(objectToEnter);
+
+            return true;
+        }
+
+        protected virtual void QueueObject(UnityEngine.Object unityObject)
+        {
+            QueueObject(Enumerable.Repeat(unityObject, 1));
+        }
+
+        protected virtual void QueueObject(IEnumerable<UnityEngine.Object> unityObjects)
+        {
+            foreach(var unityObject in unityObjects)
+                m_ObjectsToEnterPool.Enqueue(unityObject);
         }
 
         protected virtual void EnterObject(UnityEngine.Object unityObject)
@@ -68,10 +107,16 @@ namespace AssetsExporting
 
             m_Rules.Add(rule.GetType(), rule);
 
-            rule.OnObjectMatched -= OnObjectFound;
-            rule.OnObjectMatched += OnObjectFound;
+            rule.OnObjectMatched -= OnRuleFoundObject;
+            rule.OnObjectMatched += OnRuleFoundObject;
 
             return true;
+        }
+
+        protected virtual void OnRuleFoundObject(UnityEngine.Object unityObject)
+        {
+            if(null != OnObjectFound)
+                OnObjectFound.Invoke(unityObject);
         }
 
         protected virtual bool AddAllRelationRules()

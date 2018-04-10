@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace AssetsExporting
@@ -17,7 +18,7 @@ namespace AssetsExporting
             FilePath = filePath;
         }
 
-        protected List<AssetDefinition> m_AssetDefinitions = new List<AssetDefinition>();
+        protected HashSet<AssetDefinition> m_AssetDefinitions = new HashSet<AssetDefinition>();
 
         protected readonly string c_AssetSeparator = "\n";
 
@@ -31,6 +32,9 @@ namespace AssetsExporting
 
         public void AddAssetDefinition(AssetDefinition assetDefinition)
         {
+            if(m_AssetDefinitions.Any(x => x.AssetPath.Equals(assetDefinition.AssetPath)))
+                return;
+
             m_AssetDefinitions.Add(assetDefinition);
         }
 

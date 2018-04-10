@@ -30,7 +30,7 @@ namespace AssetsExporting
             relationBuilder.OnObjectEntered -= OnAssetEntered;
             relationBuilder.OnObjectEntered += OnAssetEntered;
 
-            var prefabToExport = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+            var prefabToExport = AssetDatabase.LoadMainAssetAtPath(assetPath);
             relationBuilder.Build(prefabToExport);
 
             m_Serializer.Serialize();

@@ -43,7 +43,8 @@ namespace AssetsExporting
 
         protected virtual bool VeryfyObjectType(UnityEngine.Object unityObject)
         {
-            return MatchingObjectType.IsAssignableFrom(unityObject.GetType());
+            var objectType = unityObject.GetType();
+            return objectType != typeof(UnityEngine.Object) && MatchingObjectType.IsAssignableFrom(objectType);
         }
 
         protected virtual List<UnityEngine.Object> TryFindRelatedAssets(UnityEngine.Object unityObject)
