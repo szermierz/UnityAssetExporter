@@ -41,14 +41,12 @@ namespace AssetsExportingHelpers
                     switch(m_DecisionID.Value)
                     {
                     case 0: // "Move to new directory"
-                        UnityEditor.AssetDatabase.StartAssetEditing();
                         UnityEditor.AssetDatabase.DeleteAsset(duplicatedFilePath);
                         break;
                     case 1:// "Keep asset at previous directory"
                         result.ShouldCopyFileNormal = false;
                         break;
                     case 2:// "Move to shared duplications directory"
-                        UnityEditor.AssetDatabase.StartAssetEditing();
                         UnityEditor.AssetDatabase.DeleteAsset(duplicatedFilePath);
                         result.DestDirectoryOverride = DuplicationFilesDirectory;
                         break;
@@ -83,7 +81,7 @@ namespace AssetsExportingHelpers
                     else
                         decision = new DuplicatedBehaviourDecision(extension, DuplicationFilesDirectory);
 
-                    decision.Execute(sourcePath, ref result);
+                    decision.Execute(duplicatedFilePath, ref result);
 
                     if(!s_SavedExtensionsDecisions.ContainsKey(extension) && 
                        EditorUtility.DisplayDialog("Remember decision", 
@@ -145,6 +143,8 @@ namespace AssetsExportingHelpers
 
             UnityEditor.AssetDatabase.Refresh();
             var allAssetPaths = UnityEditor.AssetDatabase.GetAllAssetPaths();
+            allAssetPaths = allAssetPaths.Select(x => x.ToLower()).ToArray();
+
             foreach(var path in allAssetPaths)
             {
                 if(Path.GetExtension(path).Equals(""))
@@ -172,8 +172,12 @@ namespace AssetsExportingHelpers
 
         public void CopyAsset(string sourcePath)
         {
+            sourcePath = sourcePath.ToLower();
             string filename = Path.GetFileName(sourcePath);
             string destPath = DestAssetsPath + "/" + filename;
+
+            if(filename.Equals("fx_circle.fbx"))
+                Debug.LogError("sotp");
 
             if(m_AssetPaths.ContainsKey(filename))
             {
@@ -186,14 +190,8 @@ namespace AssetsExportingHelpers
             }
 
             UnityEditor.AssetDatabase.StartAssetEditing();
-            try
-            {
-                CopyAssetFile(sourcePath, destPath);
-            }
-            finally
-            {
-                UnityEditor.AssetDatabase.StopAssetEditing();
-            }
+            try { CopyAssetFile(sourcePath, destPath); }
+            finally { UnityEditor.AssetDatabase.StopAssetEditing(); }
         }
 
         protected virtual void CopyAssetFile(string sourcePath, string destPath)
@@ -205,8 +203,11 @@ namespace AssetsExportingHelpers
 
             PrepareDirectoryToFileCopying(ref destPath, true);
 
-            FileUtil.CopyFileOrDirectory(sourcePath, destPath);
-            FileUtil.CopyFileOrDirectory(GetMetaFilePath(sourcePath), GetMetaFilePath(destPath));
+            try { FileUtil.CopyFileOrDirectory(sourcePath, destPath); }
+            catch(Exception) { }
+
+            try { FileUtil.CopyFileOrDirectory(GetMetaFilePath(sourcePath), GetMetaFilePath(destPath)); }
+            catch(Exception) { }
         }
 
         protected virtual void PrepareDirectoryToFileCopying(ref string path, bool ensureDirectoryExists)
@@ -232,7 +233,7 @@ namespace AssetsExportingHelpers
             }
         }
 
-        public virtual bool DoesFilesMatch(string lhvAbsolutePath, string rhvAbsolutePath)
+        protected virtual bool DoesFilesMatch(string lhvAbsolutePath, string rhvAbsolutePath)
         {
             //Func<string, string> computeFileHash = delegate(string filePath)
             //{

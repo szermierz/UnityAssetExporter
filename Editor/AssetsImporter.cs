@@ -1,4 +1,7 @@
-﻿using System.Collections;
+﻿
+//#define ENABLE_IMPORT_LOGGING
+
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using AssetsExportingHelpers;
@@ -23,7 +26,18 @@ namespace AssetsExporting
 
             var copyingHelper = new AssetsCopyingHelper(DestFilesDirectory);
             foreach(var assetDefinition in assets)
+            {
+#if ENABLE_IMPORT_LOGGING
+                Debug.Log("[AssetsImporter] Importing file " + assetDefinition.AssetPath);
+#endif
+
                 copyingHelper.CopyAsset(assetDefinition.AssetPath);
+
+#if ENABLE_IMPORT_LOGGING
+                Debug.Log("[AssetsImporter] Success!");
+#endif
+            }
+
         }
 
     }
