@@ -14,40 +14,31 @@ namespace AssetsExportingHelpers
 
         protected sealed class DuplicatedAssetsBehaviour
         {
-            public class ExpectedDuplicationHandling
-            {
-                public bool ShouldAskToRememberDecisionAcrossPackages = false;
-                public bool ShouldCopyFileNormal = true;
-                public string DestDirectoryOverride = "";
-            }
 
-            public ExpectedDuplicationHandling NotifyDuplications(string sourcePath, List<string> duplicatedFilePaths)
-            {
-                string filename = Path.GetFileName(sourcePath);
-                ExpectedDuplicationHandling result = new ExpectedDuplicationHandling();
+            public string DuplicationFilesDirectory = "";
 
-                if(duplicatedFilePaths.Count == 1)
+            private sealed class DuplicatedBehaviourDecision
+            {
+                private int? m_DecisionID;
+
+                public readonly string DuplicationFilesDirectory;
+
+                public DuplicatedBehaviourDecision(string _Extension, string _DuplicationFilesDirectory)
                 {
-                    var duplicatedFilePath = duplicatedFilePaths[0];
+                    DuplicationFilesDirectory = _DuplicationFilesDirectory;
+                }
 
-                    int duplicationDecision = 0;
-                    if(m_RememberedDecision.HasValue)
-                        duplicationDecision = m_RememberedDecision.Value;
-                    else
-                        duplicationDecision =  EditorUtility.DisplayDialogComplex("Asset duplication detected!", "File: " + filename + "\nis duplicated", "Move to new directory", "Keep previous directory", "Move to shared duplications directory");
+                public void Execute(string duplicatedFilePath, ref ExpectedDuplicationHandling result)
+                {
+                    var duplicatedFileName = Path.GetFileName(duplicatedFilePath);
 
-                    if(!m_HasAskedToRemember)
-                    {
-                        m_HasAskedToRemember = true;
+                    if(!m_DecisionID.HasValue)
+                        m_DecisionID = EditorUtility.DisplayDialogComplex("Asset duplication detected!",
+                                                          "File:  " + duplicatedFileName + "  is duplicated.\n" + 
+                                                          "Would you like to move it to the new directory, keep it at previous directory (skip importing this asset), or move it to shared duplications directory?",
+                                                          "New", "Previous", "Shared duplications");
 
-                        if(EditorUtility.DisplayDialog("Remember decision", "Do you want to remember this decision for further duplications resolving?", "Yes", "No"))
-                        {
-                            m_RememberedDecision = duplicationDecision;
-                            result.ShouldAskToRememberDecisionAcrossPackages = true;
-                        }
-                    }
-
-                    switch(duplicationDecision)
+                    switch(m_DecisionID.Value)
                     {
                     case 0: // "Move to new directory"
                         UnityEditor.AssetDatabase.StartAssetEditing();
@@ -66,6 +57,42 @@ namespace AssetsExportingHelpers
                         break;
                     }
                 }
+            }
+
+            static Dictionary<string, DuplicatedBehaviourDecision> s_SavedExtensionsDecisions = new Dictionary<string, DuplicatedBehaviourDecision>();
+
+            public class ExpectedDuplicationHandling
+            {
+                public bool ShouldCopyFileNormal = true;
+                public string DestDirectoryOverride = "";
+            }
+
+            public ExpectedDuplicationHandling NotifyDuplications(string sourcePath, List<string> duplicatedFilePaths)
+            {
+                string filename = Path.GetFileName(sourcePath);
+                string extension = Path.GetExtension(filename);
+                ExpectedDuplicationHandling result = new ExpectedDuplicationHandling();
+
+                if(duplicatedFilePaths.Count == 1)
+                {
+                    var duplicatedFilePath = duplicatedFilePaths[0];
+
+                    DuplicatedBehaviourDecision decision = null;
+                    if(s_SavedExtensionsDecisions.ContainsKey(extension))
+                        decision = s_SavedExtensionsDecisions[extension];
+                    else
+                        decision = new DuplicatedBehaviourDecision(extension, DuplicationFilesDirectory);
+
+                    decision.Execute(sourcePath, ref result);
+
+                    if(!s_SavedExtensionsDecisions.ContainsKey(extension) && 
+                       EditorUtility.DisplayDialog("Remember decision", 
+                                                   "Do you want to remember this decision for further \"*" + extension + "\"duplications resolving?", 
+                                                   "Yes", "No"))
+                    {
+                        s_SavedExtensionsDecisions.Add(extension, decision);
+                    }
+                }
                 else if(duplicatedFilePaths.Count > 1)
                 {
                     Debug.LogError("[AssetsCopying] Multiple assets with the same guid detected! Skipping a file (" + sourcePath + ")! Assets:");
@@ -78,25 +105,9 @@ namespace AssetsExportingHelpers
 
                 return result;
             }
-
-            public string DuplicationFilesDirectory = "";
-
-            int? m_RememberedDecision;
-            bool m_HasAskedToRemember = false;
-
-            static bool s_AskedForStaticSolver = false;
-            public bool AskForStaticSolver()
-            {
-                if(s_AskedForStaticSolver)
-                    return false;
-
-                s_AskedForStaticSolver = true;
-                return EditorUtility.DisplayDialog("Remember decision", "Do you want to share remembered decisions across all exporting packages?", "Yes", "No");
-            }
         }
 
         protected DuplicatedAssetsBehaviour m_DuplicationsSolver = new DuplicatedAssetsBehaviour();
-        protected static DuplicatedAssetsBehaviour s_DuplicationsSolver;
 
         public string DestAssetsPath { get; set; }
 
@@ -110,7 +121,11 @@ namespace AssetsExportingHelpers
                     return;
 
                 m_DuplicationsFolderName = value;
-                m_DuplicationsSolver.DuplicationFilesDirectory = DestAssetsPath + "/" + value;
+
+                var allDirectoriesPath = DestAssetsPath;
+                allDirectoriesPath = allDirectoriesPath.Substring(0, allDirectoriesPath.LastIndexOf("/"));
+
+                m_DuplicationsSolver.DuplicationFilesDirectory = allDirectoriesPath + "/" + value;
             }
         }
 
@@ -150,14 +165,7 @@ namespace AssetsExportingHelpers
             var duplicatedFiles = m_AssetPaths[filename];
             var matchingFiles = duplicatedFiles.Where(duplictedFilePath => DoesFilesMatch(sourcePath, duplictedFilePath)).ToList();
 
-            var solver = s_DuplicationsSolver;
-            if(null == solver)
-                solver = m_DuplicationsSolver;
-
-            var duplicationsSolvingResult = solver.NotifyDuplications(sourcePath, matchingFiles);
-
-            if(duplicationsSolvingResult.ShouldAskToRememberDecisionAcrossPackages && solver.AskForStaticSolver())
-                s_DuplicationsSolver = solver;
+            var duplicationsSolvingResult = m_DuplicationsSolver.NotifyDuplications(sourcePath, matchingFiles);
 
             return duplicationsSolvingResult;
         }
