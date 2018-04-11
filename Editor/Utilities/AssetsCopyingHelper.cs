@@ -16,7 +16,9 @@ namespace AssetsExportingHelpers
         {
             public class ExpectedDuplicationHandling
             {
-                public bool ShouldLeaveStatement = false;
+                public bool ShouldAskToRememberDecisionAcrossPackages = false;
+                public bool ShouldCopyFileNormal = true;
+                public string DestDirectoryOverride = "";
             }
 
             public ExpectedDuplicationHandling NotifyDuplications(string sourcePath, List<string> duplicatedFilePaths)
@@ -28,27 +30,40 @@ namespace AssetsExportingHelpers
                 {
                     var duplicatedFilePath = duplicatedFilePaths[0];
 
-                    bool moveToNewDir;
+                    int duplicationDecision = 0;
                     if(m_RememberedDecision.HasValue)
-                        moveToNewDir = m_RememberedDecision.Value;
+                        duplicationDecision = m_RememberedDecision.Value;
                     else
-                        moveToNewDir =  EditorUtility.DisplayDialog("Asset duplication detected!", "File: " + filename + "\nis duplicated", "Move to new directory", "Keep previous directory");
+                        duplicationDecision =  EditorUtility.DisplayDialogComplex("Asset duplication detected!", "File: " + filename + "\nis duplicated", "Move to new directory", "Keep previous directory", "Move to shared duplications directory");
 
                     if(!m_HasAskedToRemember)
                     {
                         m_HasAskedToRemember = true;
+
                         if(EditorUtility.DisplayDialog("Remember decision", "Do you want to remember this decision for further duplications resolving?", "Yes", "No"))
-                            m_RememberedDecision = moveToNewDir;
+                        {
+                            m_RememberedDecision = duplicationDecision;
+                            result.ShouldAskToRememberDecisionAcrossPackages = true;
+                        }
                     }
-                    
-                    if(moveToNewDir)
+
+                    switch(duplicationDecision)
                     {
+                    case 0: // "Move to new directory"
                         UnityEditor.AssetDatabase.StartAssetEditing();
                         UnityEditor.AssetDatabase.DeleteAsset(duplicatedFilePath);
-                    }
-                    else//"Keep asset at previous directory"
-                    {
-                        result.ShouldLeaveStatement = true;
+                        break;
+                    case 1:// "Keep asset at previous directory"
+                        result.ShouldCopyFileNormal = false;
+                        break;
+                    case 2:// "Move to shared duplications directory"
+                        UnityEditor.AssetDatabase.StartAssetEditing();
+                        UnityEditor.AssetDatabase.DeleteAsset(duplicatedFilePath);
+                        result.DestDirectoryOverride = DuplicationFilesDirectory;
+                        break;
+                    default:
+                        Debug.LogError("[AssetsCopyingHelper] Duplications resolving error! Incorrect decision result!");
+                        break;
                     }
                 }
                 else if(duplicatedFilePaths.Count > 1)
@@ -58,23 +73,51 @@ namespace AssetsExportingHelpers
                     foreach(var asset in duplicatedFilePaths)
                         Debug.LogError("[AssetsCopying] Guid duplication: " + asset);
 
-                    result.ShouldLeaveStatement = true;
+                    result.ShouldCopyFileNormal = false;
                 }
 
                 return result;
             }
 
-            bool? m_RememberedDecision;
+            public string DuplicationFilesDirectory = "";
+
+            int? m_RememberedDecision;
             bool m_HasAskedToRemember = false;
+
+            static bool s_AskedForStaticSolver = false;
+            public bool AskForStaticSolver()
+            {
+                if(s_AskedForStaticSolver)
+                    return false;
+
+                s_AskedForStaticSolver = true;
+                return EditorUtility.DisplayDialog("Remember decision", "Do you want to share remembered decisions across all exporting packages?", "Yes", "No");
+            }
         }
 
         protected DuplicatedAssetsBehaviour m_DuplicationsSolver = new DuplicatedAssetsBehaviour();
+        protected static DuplicatedAssetsBehaviour s_DuplicationsSolver;
 
         public string DestAssetsPath { get; set; }
 
-        public AssetsCopyingHelper(string destAssetsPath)
+        private string m_DuplicationsFolderName = "";
+        public string DuplicationsFolderName
+        {
+            get { return m_DuplicationsFolderName; }
+            set
+            {
+                if(m_DuplicationsFolderName.Equals(value))
+                    return;
+
+                m_DuplicationsFolderName = value;
+                m_DuplicationsSolver.DuplicationFilesDirectory = DestAssetsPath + "/" + value;
+            }
+        }
+
+        public AssetsCopyingHelper(string destAssetsPath, string duplicationsFolderName = "Common")
         {
             DestAssetsPath = destAssetsPath;
+            DuplicationsFolderName = duplicationsFolderName;
 
             BuildAssetsRecords();
         }
@@ -85,6 +128,7 @@ namespace AssetsExportingHelpers
         {
             m_AssetPaths.Clear();
 
+            UnityEditor.AssetDatabase.Refresh();
             var allAssetPaths = UnityEditor.AssetDatabase.GetAllAssetPaths();
             foreach(var path in allAssetPaths)
             {
@@ -101,21 +145,37 @@ namespace AssetsExportingHelpers
             }
         }
 
+        protected virtual DuplicatedAssetsBehaviour.ExpectedDuplicationHandling ResolveDuplications(string filename, string sourcePath)
+        {
+            var duplicatedFiles = m_AssetPaths[filename];
+            var matchingFiles = duplicatedFiles.Where(duplictedFilePath => DoesFilesMatch(sourcePath, duplictedFilePath)).ToList();
+
+            var solver = s_DuplicationsSolver;
+            if(null == solver)
+                solver = m_DuplicationsSolver;
+
+            var duplicationsSolvingResult = solver.NotifyDuplications(sourcePath, matchingFiles);
+
+            if(duplicationsSolvingResult.ShouldAskToRememberDecisionAcrossPackages && solver.AskForStaticSolver())
+                s_DuplicationsSolver = solver;
+
+            return duplicationsSolvingResult;
+        }
+
         public void CopyAsset(string sourcePath)
         {
             string filename = Path.GetFileName(sourcePath);
+            string destPath = DestAssetsPath + "/" + filename;
 
             if(m_AssetPaths.ContainsKey(filename))
             {
-                var duplicatedFiles = m_AssetPaths[filename];
-                var matchingFiles = duplicatedFiles.Where(duplictedFilePath => DoesFilesMatch(sourcePath, duplictedFilePath)).ToList();
-
-                var duplicationsSolvingResult = m_DuplicationsSolver.NotifyDuplications(sourcePath, matchingFiles);
-                if(duplicationsSolvingResult.ShouldLeaveStatement)
+                var duplicationsSolvingResult = ResolveDuplications(filename, sourcePath);
+                if(!duplicationsSolvingResult.ShouldCopyFileNormal)
                     return;
-            }
 
-            string destPath = DestAssetsPath + "/" + filename;
+                if(!duplicationsSolvingResult.DestDirectoryOverride.Equals(""))
+                    destPath = duplicationsSolvingResult.DestDirectoryOverride + "/" + filename;
+            }
 
             UnityEditor.AssetDatabase.StartAssetEditing();
             try
