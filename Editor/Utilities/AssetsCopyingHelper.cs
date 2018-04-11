@@ -172,12 +172,10 @@ namespace AssetsExportingHelpers
 
         public void CopyAsset(string sourcePath)
         {
+            string caseSensitiveFilename = Path.GetFileName(sourcePath);
             sourcePath = sourcePath.ToLower();
             string filename = Path.GetFileName(sourcePath);
-            string destPath = DestAssetsPath + "/" + filename;
-
-            if(filename.Equals("fx_circle.fbx"))
-                Debug.LogError("sotp");
+            string destPath = DestAssetsPath + "/" + caseSensitiveFilename;
 
             if(m_AssetPaths.ContainsKey(filename))
             {
@@ -186,7 +184,7 @@ namespace AssetsExportingHelpers
                     return;
 
                 if(!duplicationsSolvingResult.DestDirectoryOverride.Equals(""))
-                    destPath = duplicationsSolvingResult.DestDirectoryOverride + "/" + filename;
+                    destPath = duplicationsSolvingResult.DestDirectoryOverride + "/" + caseSensitiveFilename;
             }
 
             UnityEditor.AssetDatabase.StartAssetEditing();
