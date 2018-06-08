@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -19,19 +20,36 @@ namespace AssetsExporting
 
         private AssetDefinitionSerializer m_Serializer = null;
 
-        public void Export(string assetPath)
+        public void ExportCurrentScene()
+        {
+            var sceneName = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().name;
+            var destFilename = sceneName + ".txt";
+            var objectsToExport = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().GetRootGameObjects();
+
+            Export(destFilename, objectsToExport);
+        }
+
+        public void ExportAssetFromPath(string assetPath)
         {
             var filename = Path.GetFileName(assetPath);
-            var destFilePath = DestFileDirectory + "/" + Path.GetFileNameWithoutExtension(filename) + ".txt";
+            var destFilename = Path.GetFileNameWithoutExtension(filename) + ".txt";
+            var objectsToExport = Enumerable.Repeat(AssetDatabase.LoadMainAssetAtPath(assetPath), 1);
+
+            Export(destFilename, objectsToExport);
+        }
+
+        private void Export(string destFilename, IEnumerable<UnityEngine.Object> objectsToExport)
+        {
+            var destFilePath = DestFileDirectory + "/" + destFilename;
 
             m_Serializer = new AssetDefinitionSerializer(destFilePath);
+
             AssetRelationBuildingVisitor relationBuilder = new AssetRelationBuildingVisitor();
 
             relationBuilder.OnObjectEntered -= OnAssetEntered;
             relationBuilder.OnObjectEntered += OnAssetEntered;
 
-            var prefabToExport = AssetDatabase.LoadMainAssetAtPath(assetPath);
-            relationBuilder.Build(prefabToExport);
+            relationBuilder.Build(objectsToExport);
 
             m_Serializer.Serialize();
             m_Serializer = null;

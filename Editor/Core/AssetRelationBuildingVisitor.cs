@@ -40,6 +40,7 @@ namespace AssetsExporting
         public AssetRelationRuleBase.ObjectMatchedDelegate OnObjectFound;
 
         protected Queue<UnityEngine.Object> m_ObjectsToEnterPool = new Queue<UnityEngine.Object>();
+        protected HashSet<UnityEngine.Object> m_AlreadyEnteredObjects = new HashSet<UnityEngine.Object>();
 
         public virtual void Build(UnityEngine.Object unityObject)
         {
@@ -51,25 +52,24 @@ namespace AssetsExporting
             OnObjectFound -= QueueObject;
             OnObjectFound += QueueObject;
 
+            m_AlreadyEnteredObjects.Clear();
+
             QueueObject(unityObjects);
 
-            HashSet<UnityEngine.Object> alreadyEnteredObjects = new HashSet<UnityEngine.Object>();
-
-            while(EnterNextQueueObject(alreadyEnteredObjects))
+            while(EnterNextQueueObject())
                 ;
         }
 
-        protected virtual bool EnterNextQueueObject(HashSet<UnityEngine.Object> alreadyEnteredObjects)
+        protected virtual bool EnterNextQueueObject()
         {
             if(!m_ObjectsToEnterPool.Any())
                 return false;
 
             var objectToEnter = m_ObjectsToEnterPool.Dequeue();
 
-            if(null == objectToEnter || alreadyEnteredObjects.Contains(objectToEnter))
+            if(null == objectToEnter)
                 return true;
 
-            alreadyEnteredObjects.Add(objectToEnter);
             EnterObject(objectToEnter);
 
             return true;
@@ -83,12 +83,18 @@ namespace AssetsExporting
         protected virtual void QueueObject(IEnumerable<UnityEngine.Object> unityObjects)
         {
             foreach(var unityObject in unityObjects)
-                m_ObjectsToEnterPool.Enqueue(unityObject);
+                if(!m_AlreadyEnteredObjects.Contains(unityObject))
+                    m_ObjectsToEnterPool.Enqueue(unityObject);
         }
 
         protected virtual void EnterObject(UnityEngine.Object unityObject)
         {
-            if(null != OnObjectEntered)
+            if (m_AlreadyEnteredObjects.Contains(unityObject))
+                return;
+
+            m_AlreadyEnteredObjects.Add(unityObject);
+
+            if (null != OnObjectEntered)
                 OnObjectEntered.Invoke(unityObject);
 
             foreach(var ruleEntry in m_Rules)
@@ -111,6 +117,20 @@ namespace AssetsExporting
             rule.OnObjectMatched += OnRuleFoundObject;
 
             return true;
+        }
+
+        public virtual int ExcludeRelationRulesOfType(Type ruleType)
+        {
+            return ExcludeRelationRules(x => x.GetType() == ruleType);
+        }
+
+        public virtual int ExcludeRelationRules(System.Func<AssetRelationRuleBase, bool> verifier)
+        {
+            int previousSize = m_Rules.Count;
+
+            m_Rules = m_Rules.Where(x => verifier(x.Value)).ToDictionary(x => x.Key, x => x.Value);
+
+            return previousSize - m_Rules.Count;
         }
 
         protected virtual void OnRuleFoundObject(UnityEngine.Object unityObject)

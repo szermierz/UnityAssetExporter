@@ -6,10 +6,10 @@ using UnityEngine;
 namespace AssetsExporting
 {
 
-    public class GameObjectChildrenRule : AssetRelationRuleBase
+    public class GameObjectComponentsRule : AssetRelationRuleBase
     {
 
-        public GameObjectChildrenRule() : base(typeof(GameObject))
+        public GameObjectComponentsRule() : base(typeof(GameObject))
         { }
 
         protected override List<Object> TryFindRelatedAssets(Object unityObject)
@@ -17,8 +17,11 @@ namespace AssetsExporting
             var result = base.TryFindRelatedAssets(unityObject);
 
             var gameObject = unityObject as GameObject;
-            foreach(Transform child in gameObject.transform)
-                result.Add(child.gameObject);
+            if (!gameObject)
+                return result;
+
+            var components = gameObject.GetComponents<Component>();
+            result.AddRange(components);
 
             return result;
         }

@@ -19,15 +19,8 @@ namespace AssetsExporting
             SerializedObject serializedObject = new SerializedObject(unityObject);
 
             var property = serializedObject.GetIterator();
-
-                while (property.NextVisible(true))
-                {
-                    TryAddSerializedProperty(property, result);
-
-                    //if(property.isArray)
-                    //    for(int i = 0; i < property.arraySize; ++i)
-                    //        TryAddSerializedProperty(property.GetArrayElementAtIndex(i), result);
-                }
+            while (property.NextVisible(true))
+                TryAddSerializedProperty(property, result);
 
             return result;
         }

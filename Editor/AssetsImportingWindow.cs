@@ -47,7 +47,7 @@ public class AssetsImportingWindow : EditorWindow
             foreach(var selectedObject in selected)
             {
                 var path = AssetDatabase.GUIDToAssetPath(selectedObject);
-                exporter.Export(path);
+                exporter.ExportAssetFromPath(path);
             }
 
             EditorUtility.DisplayDialog("Finished!", "The process has finished. Successfuly or not", "Ok", "Ok, but on right");
@@ -76,6 +76,18 @@ public class AssetsImportingWindow : EditorWindow
                 var importer = new AssetsImporter(folder);
                 importer.Import(file);
             }
+
+            EditorUtility.DisplayDialog("Finished!", "The process has finished. Successfuly or not", "Ok", "Ok, but on right");
+        }
+
+        if (GUILayout.Button("Export assets from currently active scene into export info files"))
+        {
+            var exportDestPath = EditorUtility.SaveFolderPanel("Select destination folder to save export info",
+                                                               System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
+                                                               "AssetsExportInfo");
+            var exporter = new AssetsExporter(exportDestPath);
+
+            exporter.ExportCurrentScene();
 
             EditorUtility.DisplayDialog("Finished!", "The process has finished. Successfuly or not", "Ok", "Ok, but on right");
         }
